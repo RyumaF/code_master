@@ -28,6 +28,10 @@ Thumbs.db
 
 # Editor
 .vscode/
+
+# Prisma SQLite database
+prisma/*.db
+prisma/*.db-journal
 .idea/
 
 # Claude Code

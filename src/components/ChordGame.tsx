@@ -15,15 +15,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "@/src/store/gameStore";
 import { playChord } from "@/lib/audio/chordPlayer";
 import { CHORD_DEFINITIONS } from "@/lib/audio/chordData";
+import { useUserStats } from "@/src/hooks/useUserStats";
 import WaveformDisplay from "./WaveformDisplay";
 import PlayButton from "./PlayButton";
 import AnswerGrid from "./AnswerGrid";
 import ScoreBar from "./ScoreBar";
 import ResultFeedback from "./ResultFeedback";
 import StartScreen from "./StartScreen";
+import AuthButton from "./AuthButton";
+import type { ChordType } from "@/lib/audio/chordData";
 
 export default function ChordGame() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const { recordAnswer } = useUserStats();
 
   const {
     phase,
@@ -52,6 +56,20 @@ export default function ChordGame() {
     setTimeout(() => setIsPlaying(false), 2900);
   }, [currentChord, isPlaying, markPlayed]);
 
+  const handleAnswer = useCallback(
+    (answer: ChordType) => {
+      if (!currentChord) return;
+      const correct = answer === currentChord.chordType;
+      const chordType = currentChord.chordType;
+
+      submitAnswer(answer);
+
+      // Save record for logged-in users (non-blocking)
+      recordAnswer(correct, chordType, answer);
+    },
+    [currentChord, submitAnswer, recordAnswer]
+  );
+
   const correctChordDef =
     currentChord !== null
       ? CHORD_DEFINITIONS.find((d) => d.type === currentChord.chordType)
@@ -70,6 +88,7 @@ export default function ChordGame() {
 
         <div className="flex items-center gap-4">
           {phase !== "idle" && <ScoreBar score={score} />}
+          <AuthButton />
         </div>
       </header>
 
@@ -123,7 +142,7 @@ export default function ChordGame() {
 
               {/* Answer grid */}
               <AnswerGrid
-                onAnswer={submitAnswer}
+                onAnswer={handleAnswer}
                 selectedAnswer={selectedAnswer}
                 correctAnswer={
                   phase === "result" ? currentChord.chordType : null
