@@ -1,14 +1,82 @@
 "use client";
 
 import { motion } from "framer-motion";
+import type { GameMode } from "@/src/store/gameStore";
 
 interface StartScreenProps {
-  onStart: () => void;
+  onStart: (mode: GameMode) => void;
 }
 
-const CHORD_LABELS = [
-  "Major", "Minor", "Major 7", "Minor 7", "Dom 7", "m♭5", "m7♭5",
+const MODES: {
+  id: GameMode;
+  label: string;
+  sublabel: string;
+  description: string;
+  color: string;
+  icon: string;
+  tags: string[];
+}[] = [
+  {
+    id: "chord",
+    label: "コード聴音",
+    sublabel: "Chord ID",
+    description: "7種類のコードタイプを当てる",
+    color: "amber",
+    icon: "♪",
+    tags: ["Major", "Minor", "M7", "m7", "Dom7", "m♭5", "m7♭5"],
+  },
+  {
+    id: "progression",
+    label: "コード進行聴音",
+    sublabel: "Progression ID",
+    description: "5種類の有名な進行を当てる",
+    color: "cyan",
+    icon: "♬",
+    tags: ["カノン", "王道", "小室", "JTToU", "循環"],
+  },
+  {
+    id: "scale",
+    label: "スケール聴音",
+    sublabel: "Scale ID",
+    description: "27種類のスケールをファミリー別に聴き分ける",
+    color: "violet",
+    icon: "𝄞",
+    tags: ["チャーチ", "HM系", "MM系", "特殊"],
+  },
+  {
+    id: "shuffle",
+    label: "全シャッフル",
+    sublabel: "All Shuffle",
+    description: "コード・進行・スケールをランダムで出題",
+    color: "gradient",
+    icon: "⇌",
+    tags: ["Chord", "Progression", "Scale"],
+  },
 ];
+
+const BORDER_COLOR: Record<string, string> = {
+  amber:
+    "border-amber-500/40 hover:border-amber-500/80 hover:bg-amber-500/5",
+  cyan: "border-cyan-500/40 hover:border-cyan-500/80 hover:bg-cyan-500/5",
+  violet:
+    "border-violet-500/40 hover:border-violet-500/80 hover:bg-violet-500/5",
+  gradient:
+    "border-studio-border/60 hover:border-studio-border hover:bg-white/5",
+};
+
+const ICON_COLOR: Record<string, string> = {
+  amber: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+  cyan: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30",
+  violet: "text-violet-400 bg-violet-500/10 border-violet-500/30",
+  gradient: "text-white/80 bg-white/5 border-white/20",
+};
+
+const TAG_COLOR: Record<string, string> = {
+  amber: "border-amber-500/30 text-amber-500/70",
+  cyan: "border-cyan-500/30 text-cyan-500/70",
+  violet: "border-violet-500/30 text-violet-500/70",
+  gradient: "border-studio-border text-studio-muted",
+};
 
 export default function StartScreen({ onStart }: StartScreenProps) {
   return (
@@ -17,9 +85,9 @@ export default function StartScreen({ onStart }: StartScreenProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -24 }}
       transition={{ duration: 0.45 }}
-      className="flex flex-col items-center gap-10 text-center max-w-md w-full"
+      className="flex flex-col items-center gap-8 text-center max-w-2xl w-full"
     >
-      {/* Hero text */}
+      {/* ── Hero ── */}
       <div className="flex flex-col items-center gap-3">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -50,85 +118,97 @@ export default function StartScreen({ onStart }: StartScreenProps) {
           code<span className="text-amber-400">Master</span>
         </h1>
         <p className="font-mono text-studio-muted text-sm tracking-widest">
-          耳コピトレーニング
+          耳コピトレーニング — モードを選んでスタート
         </p>
       </div>
 
-      {/* Chord tags */}
+      {/* ── Mode Cards ── */}
       <motion.div
-        className="flex flex-wrap justify-center gap-2"
+        className="grid grid-cols-2 gap-3 w-full"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.25 }}
       >
-        {CHORD_LABELS.map((label, i) => (
-          <motion.span
-            key={label}
-            initial={{ opacity: 0, y: 10 }}
+        {MODES.map((mode, i) => (
+          <motion.button
+            key={mode.id}
+            onClick={() => onStart(mode.id)}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 + i * 0.06 }}
-            className="px-3 py-1.5 rounded-lg border border-studio-border bg-studio-panel font-mono text-xs text-studio-muted"
+            transition={{ delay: 0.3 + i * 0.07 }}
+            whileHover={{ scale: 1.025 }}
+            whileTap={{ scale: 0.975 }}
+            className={`
+              relative flex flex-col items-start gap-2 p-4 rounded-2xl
+              border bg-studio-panel text-left
+              transition-colors duration-200 cursor-pointer
+              ${BORDER_COLOR[mode.color]}
+            `}
           >
-            {label}
-          </motion.span>
+            {/* Icon + Label */}
+            <div className="flex items-center gap-3 w-full">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center text-lg shrink-0 ${ICON_COLOR[mode.color]}`}
+              >
+                {mode.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="font-audiowide text-sm text-white leading-tight">
+                  {mode.label}
+                </p>
+                <p className="font-mono text-[10px] text-studio-muted tracking-widest">
+                  {mode.sublabel}
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <p className="font-mono text-[11px] text-studio-muted/80 leading-relaxed">
+              {mode.description}
+            </p>
+
+            {/* Tags */}
+            <div className="flex flex-wrap gap-1 mt-auto">
+              {mode.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${TAG_COLOR[mode.color]}`}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </motion.button>
         ))}
       </motion.div>
 
-      {/* Description */}
+      {/* ── How to play ── */}
       <motion.div
-        className="flex flex-col gap-4 w-full"
+        className="panel px-5 py-4 flex flex-col gap-3 text-left w-full"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.6 }}
       >
-        <p className="font-mono text-sm text-studio-muted leading-relaxed text-center">
-          コードを聴いてタイプを当てよう。
-          <br />
-          <span className="text-amber-500/80">
-            Major / Minor / 7th系 — 7 種類
-          </span>
-        </p>
-
-        {/* How to play */}
-        <div className="panel px-5 py-4 flex flex-col gap-3 text-left">
-          <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-studio-muted">
-            How to play
-          </span>
-          <ol className="flex flex-col gap-2">
-            {[
-              { step: "01", text: "▶ ボタンを押してコードを再生する" },
-              { step: "02", text: "7 つの選択肢からコードタイプを選ぶ" },
-              { step: "03", text: "正解を重ねて耳を鍛えよう" },
-            ].map(({ step, text }) => (
-              <li key={step} className="flex items-start gap-3">
-                <span className="font-audiowide text-[10px] text-amber-500/60 mt-0.5 shrink-0">
-                  {step}
-                </span>
-                <span className="font-mono text-xs text-studio-muted leading-relaxed">
-                  {text}
-                </span>
-              </li>
-            ))}
-          </ol>
-          <p className="font-mono text-[11px] text-studio-muted/70 border-t border-studio-border pt-3 mt-1 leading-relaxed">
-            コードは毎回ランダムなルート音で鳴ります。同じコードを何度でも再生できます。
-          </p>
-        </div>
+        <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-studio-muted">
+          How to play
+        </span>
+        <ol className="flex flex-col gap-2">
+          {[
+            { step: "01", text: "▶ ボタンを押してコード・進行・スケールを再生する" },
+            { step: "02", text: "選択肢から正しい答えを選ぶ" },
+            { step: "03", text: "正解を重ねてランクを上げよう" },
+          ].map(({ step, text }) => (
+            <li key={step} className="flex items-start gap-3">
+              <span className="font-audiowide text-[10px] text-amber-500/60 mt-0.5 shrink-0">
+                {step}
+              </span>
+              <span className="font-mono text-xs text-studio-muted leading-relaxed">
+                {text}
+              </span>
+            </li>
+          ))}
+        </ol>
       </motion.div>
-
-      {/* Start button */}
-      <motion.button
-        onClick={onStart}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.94 }}
-        className="btn-primary"
-        style={{
-          boxShadow:
-            "0 0 24px rgba(245,158,11,0.35), 0 0 60px rgba(245,158,11,0.1)",
-        }}
-      >
-        Start Training
-      </motion.button>
     </motion.div>
   );
 }

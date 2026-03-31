@@ -1,13 +1,13 @@
 /**
  * gameStore.ts — Zustand game state
  *
- * State machine phases:
- *   idle ──► answering ──► result ──► answering (loop)
+ * State machine: idle ──► answering ──► result ──► answering (loop)
  *
- * Using Zustand (vs Redux) because:
- *  - No boilerplate; minimal bundle (~1 kB)
- *  - Selector-based subscriptions prevent unnecessary re-renders
- *  - Easy to extend with middleware (immer, devtools, persist)
+ * Supports 4 game modes:
+ *  chord       — identify single chord type (7 choices)
+ *  progression — identify chord progression (5 choices)
+ *  scale       — identify scale within its family
+ *  shuffle     — random mix of all three modes
  */
 
 import { create } from "zustand";
@@ -16,7 +16,18 @@ import {
   type RootNote,
   getRandomChord,
 } from "@/lib/audio/chordData";
+import {
+  type ProgressionDefinition,
+  getRandomProgression,
+} from "@/lib/audio/progressionData";
+import {
+  type ScaleDefinition,
+  getRandomScale,
+} from "@/lib/audio/scaleData";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type GameMode = "chord" | "progression" | "scale" | "shuffle";
 export type GamePhase = "idle" | "answering" | "result";
 
 export interface Score {
@@ -26,28 +37,48 @@ export interface Score {
   bestStreak: number;
 }
 
-export interface CurrentChord {
-  rootNote: RootNote;
-  octave: number;
-  chordType: ChordType;
-}
+// Discriminated union — one variant per question kind
+export type Question =
+  | {
+      kind: "chord";
+      answerId: string; // same as chordType
+      rootNote: RootNote;
+      octave: number;
+      chordType: ChordType;
+    }
+  | {
+      kind: "progression";
+      answerId: string; // progressionId
+      keyRoot: string;
+      progression: ProgressionDefinition;
+    }
+  | {
+      kind: "scale";
+      answerId: string; // scaleId
+      rootNote: string;
+      scale: ScaleDefinition;
+    };
+
+// ── Store interface ───────────────────────────────────────────────────────────
 
 interface GameState {
   phase: GamePhase;
-  currentChord: CurrentChord | null;
-  selectedAnswer: ChordType | null;
+  gameMode: GameMode;
+  question: Question | null;
+  selectedAnswer: string | null;
   isCorrect: boolean | null;
   score: Score;
-  /** Whether the chord has been played at least once this round */
   hasPlayedOnce: boolean;
 
-  // ── Actions ──────────────────────────────────────────────────────────
-  startGame: () => void;
+  setGameMode: (mode: GameMode) => void;
+  startGame: (mode: GameMode) => void;
   markPlayed: () => void;
-  submitAnswer: (answer: ChordType) => void;
+  submitAnswer: (answer: string) => void;
   nextRound: () => void;
   resetGame: () => void;
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const INITIAL_SCORE: Score = {
   correct: 0,
@@ -56,18 +87,53 @@ const INITIAL_SCORE: Score = {
   bestStreak: 0,
 };
 
+function generateQuestion(mode: GameMode): Question {
+  const kind: "chord" | "progression" | "scale" =
+    mode === "shuffle"
+      ? (
+          ["chord", "progression", "scale"] as const
+        )[Math.floor(Math.random() * 3)]
+      : mode;
+
+  switch (kind) {
+    case "chord": {
+      const { rootNote, octave, chordType } = getRandomChord();
+      return { kind: "chord", answerId: chordType, rootNote, octave, chordType };
+    }
+    case "progression": {
+      const { keyRoot, progression } = getRandomProgression();
+      return {
+        kind: "progression",
+        answerId: progression.id,
+        keyRoot,
+        progression,
+      };
+    }
+    case "scale": {
+      const { rootNote, scale } = getRandomScale();
+      return { kind: "scale", answerId: scale.id, rootNote, scale };
+    }
+  }
+}
+
+// ── Store ─────────────────────────────────────────────────────────────────────
+
 export const useGameStore = create<GameState>((set, get) => ({
   phase: "idle",
-  currentChord: null,
+  gameMode: "chord",
+  question: null,
   selectedAnswer: null,
   isCorrect: null,
   score: INITIAL_SCORE,
   hasPlayedOnce: false,
 
-  startGame: () =>
+  setGameMode: (mode) => set({ gameMode: mode }),
+
+  startGame: (mode) =>
     set({
       phase: "answering",
-      currentChord: getRandomChord(),
+      gameMode: mode,
+      question: generateQuestion(mode),
       selectedAnswer: null,
       isCorrect: null,
       hasPlayedOnce: false,
@@ -76,10 +142,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   markPlayed: () => set({ hasPlayedOnce: true }),
 
   submitAnswer: (answer) => {
-    const { currentChord, score } = get();
-    if (!currentChord || get().phase !== "answering") return;
+    const { question, score } = get();
+    if (!question || get().phase !== "answering") return;
 
-    const isCorrect = answer === currentChord.chordType;
+    const isCorrect = answer === question.answerId;
     const newStreak = isCorrect ? score.streak + 1 : 0;
 
     set({
@@ -95,19 +161,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  nextRound: () =>
+  nextRound: () => {
+    const { gameMode } = get();
     set({
       phase: "answering",
-      currentChord: getRandomChord(),
+      question: generateQuestion(gameMode),
       selectedAnswer: null,
       isCorrect: null,
       hasPlayedOnce: false,
-    }),
+    });
+  },
 
   resetGame: () =>
     set({
       phase: "idle",
-      currentChord: null,
+      question: null,
       selectedAnswer: null,
       isCorrect: null,
       score: INITIAL_SCORE,
